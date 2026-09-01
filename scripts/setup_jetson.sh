@@ -35,12 +35,48 @@ if [[ "${ans:-N}" =~ ^[Yy]$ ]]; then
 fi
 
 # ---- 3. System packages -----------------------------------------------------
-echo "== apt deps (opencv, qt, python venv, build tools) =="
+echo "== apt deps (qt, python venv, build tools) =="
 sudo apt-get update
 sudo apt-get install -y --no-install-recommends \
   python3-venv python3-dev python3-pip build-essential cmake \
-  python3-opencv python3-pyqt5 libqt5gui5 \
+  libqt5gui5 libgl1 libglib2.0-0 \
   libusb-1.0-0-dev udev i2c-tools || true
+
+# ---- 3b. Python 3.11 (required by pennylane 0.44; JetPack 5 ships 3.8) -------
+if command -v python3.11 >/dev/null 2>&1; then
+  PYBIN=python3.11
+elif python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)' 2>/dev/null; then
+  PYBIN=python3
+else
+  echo "== installing Python 3.11 from the deadsnakes PPA (JetPack 5 ships 3.8) =="
+  sudo apt-get install -y software-properties-common
+  sudo add-apt-repository -y ppa:deadsnakes/ppa
+  sudo apt-get update
+  sudo apt-get install -y python3.11 python3.11-venv python3.11-dev
+  PYBIN=python3.11
+fi
+echo "Using $PYBIN -> $($PYBIN --version)"
+
+# ---- 3c. sqlite >= 3.35 (chromadb requirement; Ubuntu 20.04 ships 3.31) ------
+SQLITE_OK=$($PYBIN - <<'PY'
+import sqlite3
+maj, mid, _ = (sqlite3.sqlite_version_info + (0, 0, 0))[:3]
+print("yes" if (maj, mid) >= (3, 35) else "no")
+PY
+)
+if [ "$SQLITE_OK" != "yes" ]; then
+  echo "== building sqlite >= 3.35 into /usr/local (chromadb needs it) =="
+  SQLITE_TARBALL=sqlite-autoconf-3460100
+  ( cd /tmp \
+    && wget -q "https://www.sqlite.org/2024/${SQLITE_TARBALL}.tar.gz" \
+    && tar xzf "${SQLITE_TARBALL}.tar.gz" \
+    && cd "$SQLITE_TARBALL" \
+    && ./configure --prefix=/usr/local >/dev/null \
+    && make -j"$(nproc)" >/dev/null \
+    && sudo make install >/dev/null \
+    && sudo ldconfig )
+  echo "   sqlite now: $($PYBIN -c 'import sqlite3; print(sqlite3.sqlite_version)')"
+fi
 
 # DepthAI needs a udev rule so the OAK-D Lite is reachable without root
 echo "== DepthAI udev rule for OAK-D =="
@@ -48,9 +84,11 @@ echo 'SUBSYSTEM=="usb", ATTRS{idVendor}=="03e7", MODE="0666"' | \
   sudo tee /etc/udev/rules.d/80-movidius.rules >/dev/null
 sudo udevadm control --reload-rules && sudo udevadm trigger || true
 
-# ---- 4. Python venv (system-site so we get apt's cv2/PyQt5/CUDA) ------------
-echo "== python venv (.venv, --system-site-packages) =="
-python3 -m venv --system-site-packages "$ROOT/.venv"
+# ---- 4. Python venv ----------------------------------------------------------
+# NOTE: no --system-site-packages — apt's cv2/PyQt5 are built for Python 3.8 and
+# would not import in a 3.11 venv anyway; everything comes from pip wheels.
+echo "== python venv (.venv, $PYBIN) =="
+"$PYBIN" -m venv "$ROOT/.venv"
 # shellcheck disable=SC1091
 source "$ROOT/.venv/bin/activate"
 python -m pip install --upgrade pip wheel setuptools
@@ -59,19 +97,15 @@ python -m pip install --upgrade pip wheel setuptools
 echo "== pip deps =="
 python -m pip install -r "$ROOT/requirements-jetson.txt"
 
-# ---- 6. PyTorch (JetPack-specific) — detect, then guide ---------------------
+# ---- 6. PyTorch --------------------------------------------------------------
+# requirements-jetson.txt installs the CPU aarch64 torch wheel from PyPI, which is
+# all this app needs (quantum sim = lightning.qubit on CPU; torch = classical layers
+# only). NVIDIA's JetPack CUDA wheels are Python-3.8-only and NOT compatible with
+# the 3.11 venv — do not mix them in.
 if python -c "import torch" 2>/dev/null; then
-  echo "== torch already present: $(python -c 'import torch;print(torch.__version__, "cuda", torch.cuda.is_available())') =="
+  echo "== torch present: $(python -c 'import torch;print(torch.__version__, "cuda", torch.cuda.is_available())') =="
 else
-  echo "!! PyTorch is NOT installed and must match $JP (L4T $L4T)."
-  echo "   Recommended: NVIDIA's Jetson wheel index (community mirror jetson-ai-lab):"
-  case "$L4T_MAJOR" in
-    36) echo "     pip install torch torchvision --index-url https://pypi.jetson-ai-lab.dev/jp6/cu126" ;;
-    35) echo "     pip install torch torchvision --index-url https://pypi.jetson-ai-lab.dev/jp5/cu114" ;;
-    32) echo "     Use NVIDIA's JP4 torch wheel from developer.download.nvidia.com (Python 3.6/3.8)." ;;
-    *)  echo "     Unknown L4T — paste identify_board.sh output and I'll pin the exact wheel." ;;
-  esac
-  echo "   (torch is only needed for the classical QCNN layers; the quantum sim runs on CPU.)"
+  echo "!! torch missing — re-run: pip install -r requirements-jetson.txt"
 fi
 
 # ---- 7. Verify --------------------------------------------------------------

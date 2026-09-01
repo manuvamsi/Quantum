@@ -1,0 +1,36 @@
+# Jetson (aarch64) requirements for the ReQAgnIze edge appliance.
+# Verified: every pin below has a manylinux aarch64 wheel for Python 3.11.
+#
+# IMPORTANT — Xavier NX / JetPack 5.x (Ubuntu 20.04) notes:
+#   * JetPack 5 ships Python 3.8, but pennylane/pennylane-lightning 0.44 need
+#     Python >= 3.11. Install python3.11 from the deadsnakes PPA first
+#     (scripts/setup_jetson.sh does this for you).
+#   * torch installs the CPU aarch64 wheel from PyPI. That is fine: the quantum
+#     circuits run on the CPU (lightning.qubit) and torch is only used for the
+#     classical layers — CUDA is NOT required by this app.
+#   * chromadb needs sqlite >= 3.35 but Ubuntu 20.04 ships 3.31; setup_jetson.sh
+#     builds a newer libsqlite3 into /usr/local (python picks it up via ldconfig).
+#
+#   pip install -r requirements-jetson.txt
+
+# ── core recognition + PQC (same pins as the laptop file) ──────────
+numpy==1.26.4
+torch==2.2.2                         # CPU aarch64 wheel from PyPI; CUDA not needed
+opencv-contrib-python==4.11.0.86     # GUI build (kiosk window needs imshow)
+pennylane==0.44.0
+pennylane-lightning==0.44.0          # lightning.qubit backend (aarch64 wheel, needs glibc>=2.28: OK on 20.04)
+gast==0.6.0                          # transitive dep of pennylane that pip sometimes misses
+scikit-learn==1.7.2
+joblib==1.5.3
+chromadb==1.4.0                      # needs sqlite >= 3.35 (see note above)
+cryptography==46.0.3
+PyYAML==6.0.3
+
+# ── monitoring / sync ───────────────────────────────────────────────
+prometheus-client==0.21.1
+requests==2.32.5
+
+# ── device-only (the reason this file exists) ──────────────────────
+depthai==2.24.0.0                    # OAK-D Lite camera (RGB + depth)
+Jetson.GPIO==2.1.6                   # physical button / relay / status LED
+mediapipe==0.10.14                   # blink + head-yaw FALLBACK liveness
