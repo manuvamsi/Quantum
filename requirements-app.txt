@@ -1,0 +1,27 @@
+# Minimal requirements to RUN the NVIDIA_App edge app
+# (recognition + face/non-face gate + liveness + PQC + kiosk).
+# Exact versions verified on the dev machine (Python 3.11).
+# On the Jetson: torch comes from the JetPack wheel and cv2 from apt (python3-opencv) — see setup_jetson.sh.
+#
+#   pip install -r requirements-app.txt
+
+# ── required (core recognition + PQC) ──────────────────────────────
+numpy==1.26.4
+torch==2.2.2
+opencv-contrib-python==4.11.0.86     # cv2 — GUI build (kiosk window needs imshow)
+pennylane==0.44.0
+pennylane-lightning==0.44.0          # lightning.qubit backend (speed)
+scikit-learn==1.7.2                  # PCA + StandardScaler for the classifier (pulls scipy)
+joblib==1.5.3                        # loads pca_model.pkl / scaler.pkl
+chromadb==1.4.0                      # 512-dim vector database
+cryptography==46.0.3                 # PQC AES-256-GCM layer
+PyYAML==6.0.3                        # config.yaml
+
+# ── optional but recommended (import-guarded; app still runs if absent) ──
+prometheus-client==0.21.1            # /metrics for Grafana
+requests==2.32.5                     # sync access events to the admin dashboard
+
+# ── device-only (Jetson) — NOT needed for laptop webcam testing ──
+# depthai>=2.24.0      # OAK-D Lite camera (RGB + depth)
+# Jetson.GPIO>=2.1.0   # physical button / relay / status LED
+# mediapipe            # blink + head-yaw FALLBACK liveness

@@ -1,0 +1,13 @@
+# Generated at runtime on the test machine — never commit.
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Per-machine data created on first run
+vector_db/
+events.db
+vendor/PQC/keys/
+vendor/PQC/encrypted_metadata/
+vendor/PQC/encrypted_store/
+vendor/logs/

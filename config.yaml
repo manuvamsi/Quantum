@@ -1,0 +1,79 @@
+# ReQAgnIze — Testing_App_deployment configuration.
+# Defaults here are tuned for a plain LAPTOP with a webcam (Windows / Linux / macOS):
+# webcam camera, local liveness test mode, no GPIO, no Prometheus, no cloud sync.
+# For a Jetson + OAK-D deployment, flip the four marked lines (see README "Jetson").
+
+paths:
+  # Vendored quantum model code + weights (src, src_v2, src_v3, PQC, models/) so the app
+  # is fully self-contained and does NOT depend on the sibling quantum_face_recognition
+  # folder. Overridable via the QFR_PATH env var.
+  qfr_path: "vendor"
+
+device:
+  id: "reqagnize-edge-01"          # unique per device (used in event records / dashboard)
+  display:
+    width: 800                     # set to your small display's native resolution
+    height: 480
+    fullscreen: false
+
+camera:
+  backend: "webcam"                # laptop default. Jetson: set "auto" (OAK-D if present, else webcam)
+  webcam_index: 0                  # used when backend resolves to webcam (local testing)
+  # --- OAK-D Lite (DepthAI) ---
+  rgb_fps: 20
+  rgb_resolution: "1080p"          # downscaled internally for inference
+  depth_enabled: true
+  on_vpu_detection: true           # run face detection/landmarks on the OAK-D VPU (low latency)
+
+model:                             # V2 Quantum Haar Wavelet + PQC-NTRU + ChromaDB
+  version: "v2"
+  quantum_device: "lightning.qubit"  # C++ backend for speed (falls back to default.qubit)
+  recognition_threshold: 0.75
+  min_votes: 2
+  classify_enabled: true             # 10-qubit face/non-face gate (V1-style), before recognition
+  classify_threshold: 0.50           # accept as face if face_prob >= this
+  embedding_dim: 512
+  weights_path: "models/qcnn_v2_trained.pth"
+  vector_db_dir: "vector_db"
+  chroma_collection: "face_embeddings_v2"
+  pqc_keys_dir: "pqc_keys"           # NTRU public/private keys on-device
+
+liveness:
+  # Depth 3D-region check is PRIMARY; blink + head-yaw are FALLBACK only.
+  mode: "fast"                       # fast | balanced | strict
+  local_test_mode: true            # true = accept a live face w/o depth/gestures (LAPTOP TESTING ONLY)
+  auto_start: true                   # begin when a face is centered & close
+  allow_manual_start: true           # also allow a button/tap to begin
+  min_face_ratio: 0.16               # face width / frame width to count as "close enough"
+  center_tolerance: 0.24             # how far off-center the face may be (fraction of frame)
+  assess_frames: 8                   # frames to accumulate depth/motion before deciding
+  depth_primary: true
+  depth_strong_variance_mm: 18.0     # >= this depth relief in the face box => confidently 3D
+  depth_min_variance_mm: 8.0         # below this => flat (photo/screen) => reject
+  depth_region_min_ratio: 0.35       # fraction of face box with valid depth pixels
+  motion_threshold: 1.0              # frame-to-frame motion (rejects a frozen frame)
+  fallback:
+    require_blink: true
+    blink_ear_threshold: 0.21
+    require_head_turn: true          # rotate left then right
+    yaw_threshold_deg: 18.0
+    step_timeout_sec: 6.0
+  timeout_sec: 12.0
+
+gpio:
+  enabled: false                     # laptop default (no GPIO). Jetson: set true for the physical button
+  power_button_pin: 18               # BOARD numbering; momentary push-button -> on/off
+  status_led_pin: 16                 # optional
+  relay_pin: 0                       # 0 = disabled; set a pin to pulse a door lock on ACCESS ALLOWED
+  relay_pulse_sec: 1.5
+
+events:                              # Stage 4b — records + admin dashboard
+  sqlite_path: "events.db"
+  sync_enabled: false                # laptop default (log locally only). Set true to POST to a cloud API
+  cloud_api_url: "http://localhost:8000"   # web_api base; POST /api/events
+  device_token: ""                   # set per device for ingest auth
+  store_thumbnail: false             # privacy: false = store embedding/metadata only
+
+metrics:                             # Stage 4 — Prometheus
+  enabled: false                     # laptop default (no /metrics server). Set true on the Jetson
+  port: 9108
