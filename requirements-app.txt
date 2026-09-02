@@ -10,6 +10,7 @@ numpy==1.26.4
 torch==2.2.2
 opencv-contrib-python==4.11.0.86     # cv2 — GUI build (kiosk window needs imshow)
 pennylane==0.44.0
+gast==0.6.0                          # transitive dep of pennylane that pip sometimes misses
 pennylane-lightning==0.44.0          # lightning.qubit backend (speed)
 scikit-learn==1.7.2                  # PCA + StandardScaler for the classifier (pulls scipy)
 joblib==1.5.3                        # loads pca_model.pkl / scaler.pkl
