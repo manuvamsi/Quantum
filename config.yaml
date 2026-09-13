@@ -17,7 +17,7 @@ device:
     fullscreen: false
 
 camera:
-  backend: "webcam"                # laptop default. Jetson: set "auto" (OAK-D if present, else webcam)
+  backend: "auto"                  # Jetson: OAK-D Lite if present, else webcam
   webcam_index: 0                  # used when backend resolves to webcam (local testing)
   # --- OAK-D Lite (DepthAI) ---
   rgb_fps: 20
@@ -41,7 +41,7 @@ model:                             # V2 Quantum Haar Wavelet + PQC-NTRU + Chroma
 liveness:
   # Depth 3D-region check is PRIMARY; blink + head-yaw are FALLBACK only.
   mode: "fast"                       # fast | balanced | strict
-  local_test_mode: true            # true = accept a live face w/o depth/gestures (LAPTOP TESTING ONLY)
+  local_test_mode: false            # true = accept a live face w/o depth/gestures (LAPTOP TESTING ONLY)
   auto_start: true                   # begin when a face is centered & close
   allow_manual_start: true           # also allow a button/tap to begin
   min_face_ratio: 0.16               # face width / frame width to count as "close enough"
