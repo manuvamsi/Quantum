@@ -14,7 +14,7 @@ from .qcnn_recognition_v2 import QCNNEmbeddingExtractor
 class FaceRecognizer:
     def __init__(self, db_dir=None, collection_name='face_embeddings_v2',
                  threshold=0.75, metric='cosine', seed: int = 42,
-                 embedding_mode='optimized'):
+                 embedding_mode='optimized', embedding_backend="hybrid"):
         """
         Initialize FaceRecognizer v2 with ChromaDB backend.
 
@@ -28,6 +28,8 @@ class FaceRecognizer:
             metric: Distance metric - 'cosine' or 'l2' (Euclidean)
             seed: Random seed for reproducible QCNN embeddings
             embedding_mode: Always 'optimized' in v2 (512-dim, grayscale)
+            embedding_backend: "hybrid" (facenet VGGFace2 + QCNN, 1024-dim — default)
+                               or "quantum" (original QCNN-only, 512-dim)
         """
         # Use absolute path to Vector DB_v2/ (separate from v1's Vector DB/)
         if db_dir is None:
@@ -43,8 +45,19 @@ class FaceRecognizer:
         self.embedding_mode = 'optimized'  # v2 always uses optimized mode
         self.pickle_path = os.path.join('models', 'recognition_db_v2.pkl')
 
-        # Initialize 8-qubit Hierarchical QCNN with Haar Wavelet feature extraction
-        self.embedding_extractor = QCNNEmbeddingExtractor(seed=seed, use_optimized=True)
+        # Embedding backend: hybrid (default) or pure quantum
+        if embedding_backend == "hybrid":
+            try:
+                from .hybrid_embedding import HybridEmbeddingExtractor
+                self.embedding_extractor = HybridEmbeddingExtractor(seed=seed)
+                print(f"Embedding backend: HYBRID (facenet VGGFace2 + 8-qubit QCNN), "
+                      f"{self.embedding_extractor.embedding_dim}-dim")
+            except Exception as e:
+                print(f"[recognition_v2] hybrid backend unavailable "
+                      f"({type(e).__name__}: {e}) — falling back to quantum-only")
+                self.embedding_extractor = QCNNEmbeddingExtractor(seed=seed, use_optimized=True)
+        else:
+            self.embedding_extractor = QCNNEmbeddingExtractor(seed=seed, use_optimized=True)
 
         self._init_chromadb()
         self._load_pickle_backup()
@@ -61,9 +74,12 @@ class FaceRecognizer:
         if self.collection_name not in existing_collections:
             self.collection = self.client.create_collection(
                 name=self.collection_name,
-                metadata={"hnsw:space": hnsw_space, "embedding_dim": "512", "version": "2.0"}
+                metadata={"hnsw:space": hnsw_space,
+                          "embedding_dim": str(self.embedding_extractor.embedding_dim),
+                          "version": "2.0"}
             )
-            print(f"Created v2 ChromaDB collection (512-dim, Haar Wavelet) with {hnsw_space} metric")
+            print(f"Created v2 ChromaDB collection "
+                  f"({self.embedding_extractor.embedding_dim}-dim, {hnsw_space} metric)")
         else:
             self.collection = self.client.get_collection(self.collection_name)
 

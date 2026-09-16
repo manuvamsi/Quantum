@@ -36,6 +36,7 @@ class RecognitionEngine:
         self.qfr = qfr_path(cfg)
         self.classify_enabled = bool(m.get("classify_enabled", True))
         self.classify_threshold = float(m.get("classify_threshold", 0.50))
+        self.embedding_backend = str(m.get("embedding_backend", "hybrid"))
 
         self._load_lock = threading.Lock()
         self._infer_lock = threading.Lock()
@@ -79,6 +80,7 @@ class RecognitionEngine:
                     db_dir=self.vector_db_dir,
                     collection_name=self.collection,
                     threshold=self.threshold,
+                    embedding_backend=self.embedding_backend,
                 )
                 self.preprocessor = FacePreprocessor()
                 self.detector = FaceDetector()

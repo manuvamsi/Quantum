@@ -28,14 +28,15 @@ camera:
 model:                             # V2 Quantum Haar Wavelet + PQC-NTRU + ChromaDB
   version: "v2"
   quantum_device: "lightning.qubit"  # C++ backend for speed (falls back to default.qubit)
-  recognition_threshold: 0.75
+  recognition_threshold: 0.50       # hybrid embedding: impostor max ~0.39, genuine min ~0.60 (calibrated 2026-09-16)
   min_votes: 2
   classify_enabled: true             # 10-qubit face/non-face gate (V1-style), before recognition
   classify_threshold: 0.50           # accept as face if face_prob >= this
-  embedding_dim: 512
+  embedding_dim: 1024                # hybrid: facenet(512) + quantum QCNN(512)
+  embedding_backend: "hybrid"        # "hybrid" = facenet VGGFace2 + quantum QCNN; "quantum" = original QCNN-only
   weights_path: "models/qcnn_v2_trained.pth"
   vector_db_dir: "vector_db"
-  chroma_collection: "face_embeddings_v2"
+  chroma_collection: "face_embeddings_v3_hybrid"   # 1024-dim hybrid embedding collection
   pqc_keys_dir: "pqc_keys"           # NTRU public/private keys on-device
 
 liveness:
