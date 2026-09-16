@@ -157,3 +157,25 @@ cd ~/FR_project/Testing_App_deployment_v2 && nohup ./run_jetson.sh > /tmp/kiosk.
 ---
 
 *Working state as of 2026-09-13: kiosk PID running via `./run_jetson.sh`; engine `lightning.qubit`, OAK-D RGB+depth, depth liveness, PQC recognition all verified live.*
+
+
+---
+
+## 8. Fix Log — 2026-09-16: Recognition Discrimination Fix (hybrid embedding)
+
+**Problem:** every face (registered or not) was recognized as the single enrolled user, and new
+registrations were blocked with "Already registered as '<name>'".
+
+**Root cause:** the pure quantum embedding (Haar-wavelet stats → 8-qubit QCNN, 512-dim) is nearly
+input-independent — random noise scored ~0.95 cosine against an enrolled face; impostor faces scored
+0.90–0.96, overlapping the genuine band. No threshold could separate people.
+
+**Fix:** hybrid embedding (`model.embedding_backend: "hybrid"`) — 1024-dim signature =
+0.85 × InceptionResNetV1 (VGGFace2) + 0.15 × quantum QCNN (both L2-normalized).
+Threshold recalibrated 0.75 → 0.50 (impostor max ≈ 0.39, genuine min ≈ 0.60, calibrated 2026-09-16).
+New collection `face_embeddings_v3_hybrid`; the old 512-dim DB was wiped — re-enrollment required.
+Fallback to quantum-only if `facenet_pytorch` is missing.
+
+**Verification:** 8/8 impostors denied (0.0–0.35); registered person accepted across variants
+(0.71–0.99); new registration works; duplicate check still blocks; selfcheck PASS; pytest 3 passed.
+Released as `v2.0.1` on GitHub.
