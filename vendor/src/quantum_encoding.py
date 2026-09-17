@@ -13,7 +13,7 @@ from sklearn.preprocessing import StandardScaler
 class QuantumEncoder:
     """
     Encode classical image data into quantum states
-    Uses pre-trained PCA and scaler models for inference
+    Uses pre-trained PCA and scaler models for inference from models_dir (default: models/)
     """
 
     def __init__(self, n_components: int = 10, models_dir: str = "models"):
@@ -23,7 +23,7 @@ class QuantumEncoder:
         self.pca = None
         self.scaler = None
 
-        # Try to load pre-trained models
+        # Try to load pre-trained models and checks
         self._load_models()
 
     def _load_models(self):

@@ -1,4 +1,6 @@
 """
+
+I am not aware of this KIOSK,this has suggested by the llm when i tried to run on hardware"
 kiosk.py — the small-display UI, rendered with OpenCV HighGUI (fullscreen).
 
 Chosen over a heavy GUI toolkit for lowest latency and minimal deps on the Jetson.
@@ -8,11 +10,6 @@ Renders the camera feed + prompts + big result, and draws an on-screen POWER but
 
 import cv2
 import numpy as np
-import os
-import subprocess
-import logging
-
-_log = logging.getLogger(__name__)
 
 WIN = "ReQAgnIze"
 
@@ -42,32 +39,8 @@ class Kiosk:
         if self.fullscreen:
             cv2.setWindowProperty(WIN, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
         cv2.setMouseCallback(WIN, self._on_mouse)
-        self._force_opaque()
 
     # ── input ─────────────────────────────────────────────────────────────────
-    @staticmethod
-    def _force_opaque():
-        """Bypass GNOME compositor so the window renders fully opaque on Wayland/Xwayland."""
-        if os.environ.get("XDG_SESSION_TYPE", "") not in ("", "tty"):
-            return  # not SSH — compositor handles it natively
-        try:
-            import time
-            time.sleep(0.3)
-            result = subprocess.run(
-                ["xdotool", "search", "--name", WIN],
-                capture_output=True, text=True, timeout=3
-            )
-            for wid in result.stdout.strip().split("\n"):
-                if wid:
-                    subprocess.run(
-                        ["xprop", "-id", wid, "-f", "_NET_WM_BYPASS_COMPOSITOR", "32c",
-                         "-set", "_NET_WM_BYPASS_COMPOSITOR", "1"],
-                        capture_output=True, timeout=3
-                    )
-            _log.debug("Set _NET_WM_BYPASS_COMPOSITOR=1 on kiosk window")
-        except Exception as e:
-            _log.debug(f"Could not force opaque (non-critical): {e}")
-
     def _on_mouse(self, event, x, y, *_):
         if event == cv2.EVENT_LBUTTONDOWN:
             self._click = (x, y)

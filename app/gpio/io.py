@@ -5,8 +5,7 @@ io.py — physical device I/O via Jetson.GPIO.
 - status LED: on when the device is powered/ready
 - optional relay: pulsed on ACCESS ALLOWED to drive a door strike/lock
 
-Jetson.GPIO is guarded so this compiles/runs on a dev machine (mock mode: no-ops,
-keyboard 'p' in the kiosk substitutes for the physical button).
+This is initially when i started using the jeston,the plan to have button and so,so not required for now
 """
 
 import threading

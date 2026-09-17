@@ -1,9 +1,5 @@
 """
-store.py — on-device access-event log (SQLite) with background sync to the cloud API.
-
-Every recognition/liveness result is written locally first (offline-safe), then a background
-thread POSTs unsynced rows to the web_api (`POST /api/events`) and marks them synced. The
-admin dashboard in quanverge-web reads them from the cloud DB.
+This is not used to run the app,later for cloud sync it is declared.So, it is not mandatory to check this file for running the app.
 """
 
 import os
@@ -13,7 +9,7 @@ import time
 
 try:
     import requests
-except Exception:  # pragma: no cover
+except Exception:  
     requests = None
 
 from app.config import abspath

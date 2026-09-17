@@ -17,7 +17,7 @@ except Exception:
     dev = qml.device("default.qubit", wires=N_QUBITS)
 
 
-@qml.qnode(dev, interface="torch", diff_method="finite-diff")
+@qml.qnode(dev, interface="torch", diff_method="finite-diff") #other diff_method is parameter-shift, finite-diff is faster for this circuit
 def qcnn_circuit(inputs, weights):
     """
     Full QCNN circuit with encoding, quanvolution, pooling
@@ -30,13 +30,13 @@ def qcnn_circuit(inputs, weights):
         Pauli-Z expectation on q0
     """
     
-    # ===== ENCODING LAYER (RYZ) =====
+    #  ENCODING LAYER (RYZ)
     for i in range(5):
         qml.RY(inputs[i], wires=i)
     for i in range(5, 10):
         qml.RZ(inputs[i], wires=i)
     
-    # ===== QUANVOLUTIONAL LAYER 1 =====
+    # LAYER 1 
     # IsingYY (intra-channel entanglement)
     qml.IsingYY(weights[0], wires=[0, 1])  # R-channel
     qml.IsingYY(weights[1], wires=[2, 3])  # G-channel

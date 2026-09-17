@@ -20,6 +20,7 @@ PyYAML==6.0.3                        # config.yaml
 # ── optional but recommended (import-guarded; app still runs if absent) ──
 prometheus-client==0.21.1            # /metrics for Grafana
 requests==2.32.5                     # sync access events to the admin dashboard
+pyrealsense2                         # Intel RealSense camera (RGB) — set camera.backend: "realsense"
 
 # ── device-only (Jetson) — NOT needed for laptop webcam testing ──
 # depthai>=2.24.0      # OAK-D Lite camera (RGB + depth)

@@ -1,14 +1,9 @@
 """
-checks.py - liveness state machine.
+checks.py - liveness 
 
 PRIMARY: OAK-D depth 3D-region anti-spoof (+ motion). A real face has depth relief across
-the face box; a photo/screen is ~flat and gets rejected. FALLBACK (blink -> turn left ->
-turn right) runs only when depth is weak/inconclusive or unavailable.
+the face box; a photo/screen is ~flat and gets rejected. 
 
-Modes (config `liveness.mode`):
-  fast     - grant on strong depth + motion; gestures only if depth is weak.
-  balanced - always require at least a blink in addition to depth.
-  strict   - always require blink + head-turn.
 
 `process(rgb_bgr, depth_mm, bbox)` is called per frame and returns:
   {state, prompt, done, passed}

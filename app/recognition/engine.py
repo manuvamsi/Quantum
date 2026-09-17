@@ -6,8 +6,8 @@ adds PQC-NTRU encrypted identity, and keeps a device-local ChromaDB. It reuses t
 proven pipeline from `quantum_face_recognition/web_api/recognition_service.py`
 (detect -> preprocess -> embed -> recognize_with_voting) and adds enroll + PQC.
 
-The heavy model is loaded ONCE (on power-on) and kept warm; recognition runs only
-after liveness passes. The V2 embedder already uses `lightning.qubit` for speed.
+The heavy model is loaded ONCE (on power-on) and kept ; recognition runs only
+after liveness passes. The V2 embedder already uses `lightning.qubit`(This is Quantum SDK simulation device name which is written in python) for speed.
 """
 
 import os
@@ -36,7 +36,7 @@ class RecognitionEngine:
         self.qfr = qfr_path(cfg)
         self.classify_enabled = bool(m.get("classify_enabled", True))
         self.classify_threshold = float(m.get("classify_threshold", 0.50))
-        self.embedding_backend = str(m.get("embedding_backend", "hybrid"))
+        self.block_threshold = float(m.get("block_threshold", 0.90))  # enroll duplicate gate
 
         self._load_lock = threading.Lock()
         self._infer_lock = threading.Lock()
@@ -58,19 +58,22 @@ class RecognitionEngine:
             if self.qfr not in sys.path:
                 sys.path.insert(0, self.qfr)
 
-            # The V2 embedder auto-detects models/qcnn_v2_trained.pth relative to CWD,
-            # so load from the model dir; the ChromaDB path is passed absolutely and is
-            # unaffected by the temporary chdir.
+            # The V2 embedder auto-detects models/qcnn_v2_trained.pth D,
+            # so load from the model dir; the ChromaDB path is passed explicitly.
             prev = os.getcwd()
             os.chdir(self.qfr)
             try:
-                from src_v2.recognition_v2 import FaceRecognizer
+                version = str(self.cfg.get("model", {}).get("version", "v2")).lower()
+                if version == "ensemble":
+                    from src_v2.recognition_ensemble import FaceRecognizer
+                else:
+                    from src_v2.recognition_v2 import FaceRecognizer
                 from src_v2.preprocessing import FacePreprocessor
                 from src.face_detection import FaceDetector
                 from PQC.metadata_storage import get_metadata_storage
                 from PQC.ntru import NTRUKeyGenerator
 
-                # Fresh device: ensure NTRU keys exist (generates on first run).
+                # New device: ensure NTRU keys exist (generates on first run only).
                 keys_dir = os.path.join(self.qfr, "PQC", "keys")
                 if not (os.path.exists(os.path.join(keys_dir, "public_key.pkl"))
                         and os.path.exists(os.path.join(keys_dir, "private_key.pkl"))):
@@ -80,7 +83,6 @@ class RecognitionEngine:
                     db_dir=self.vector_db_dir,
                     collection_name=self.collection,
                     threshold=self.threshold,
-                    embedding_backend=self.embedding_backend,
                 )
                 self.preprocessor = FacePreprocessor()
                 self.detector = FaceDetector()
@@ -93,7 +95,7 @@ class RecognitionEngine:
                     self._classify = classify_face
 
                 # Warm BOTH quantum circuits at power-on so the first real recognition is
-                # fast (otherwise the first call pays a one-time trace/compile cost).
+               
                 dummy = np.zeros((96, 96, 3), np.uint8)
                 for _ in range(2):
                     try:
@@ -127,7 +129,7 @@ class RecognitionEngine:
 
     # ── core pipeline ─────────────────────────────────────────────────────────
     def _detect_roi(self, img_bgr: np.ndarray) -> np.ndarray:
-        """Detect the largest face and return its BGR ROI (raises if none)."""
+        """Detect the largest face and return its BGR ROI (raises if none)i.e., largest face comes when a person is near to camera."""
         faces = self.detector.detect_faces(img_bgr)
         if not faces:
             raise EngineError("No face detected")
@@ -142,7 +144,10 @@ class RecognitionEngine:
         return is_face, face_prob
 
     def _embed_roi(self, roi_bgr: np.ndarray) -> np.ndarray:
-        """Preprocess a face ROI and return its 512-dim V2 embedding."""
+        """Return the 512-dim embedding for a face ROI. If the recognizer owns its own
+        preprocessing (exposes embed_roi, e.g. the ensemble), use it; else the V2 64x64 path."""
+        if hasattr(self.recognizer, "embed_roi"):
+            return self.recognizer.embed_roi(roi_bgr)
         rgb = cv2.cvtColor(roi_bgr, cv2.COLOR_BGR2RGB)
         pre = self.preprocessor.preprocess(rgb, for_recognition=True)
         return self.recognizer.extract_embedding((pre * 255).astype(np.uint8))
@@ -181,12 +186,21 @@ class RecognitionEngine:
                     raise EngineError(f"Image {i + 1}: not a face (p={fp:.2f})")
                 embeddings.append(self._embed_roi(roi))
 
-            # Block if this face already matches a registered user.
+            # Block only if VERY close to an existing user (direct top-1 cosine similarity vs a
+            # dedicated block threshold, so a genuinely different face is not rejected as a duplicate).
             if self.recognizer.collection.count() > 0:
                 for emb in embeddings:
-                    user, score, _ = self.recognizer.recognize_with_voting(emb, n_results=5)
-                    if user != "Unknown" and score >= self.threshold:
-                        raise EngineError(f"Already registered as '{user}' (sim {score:.2f})")
+                    res = self.recognizer.collection.query(
+                        query_embeddings=[emb.astype(float).tolist()],
+                        n_results=min(5, self.recognizer.collection.count()),
+                        include=["distances", "metadatas"],
+                    )
+                    dists = res.get("distances") or [[]]
+                    if dists[0]:
+                        top_sim = 1.0 - dists[0][0]
+                        if top_sim > self.block_threshold:
+                            match = (res.get("metadatas") or [[{}]])[0][0].get("name", "Unknown")
+                            raise EngineError(f"Already registered as '{match}' (sim {top_sim:.2f})")
 
             user_id = name.lower().replace(" ", "_")
             self.recognizer.add_person(name, embeddings, phone=phone, age=age, user_id=user_id)

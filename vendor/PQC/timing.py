@@ -1,5 +1,5 @@
 """
-Timing Instrumentation for Face Recognition Pipeline
+Timing Instrumentation for Face Recognition Pipeline just for underanding the time taken by each step of the pipeline. This is useful for debugging and performance analysis.
 
 Tracks and logs timing for:
 i)   Capture time

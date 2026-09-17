@@ -1,24 +1,17 @@
-"""
-oak.py — OAK-D Lite (DepthAI) pipeline: RGB preview + stereo depth aligned to RGB.
 
-Gives the app synchronized frames: `read()` -> (rgb_bgr, depth_mm_or_None). Depth is a
-uint16 map (millimetres) aligned pixel-for-pixel to the RGB preview, so we can sample the
-depth inside a face box for the 3D anti-spoof check.
-
-depthai is imported lazily/guarded so this module byte-compiles on a dev machine without
-the SDK; on the Jetson it needs `depthai` (installed by setup_jetson.sh).
-"""
-
+'''
+OAK-D camera backend is not mandatory as of now,you can choose "auto" in the "C:/Users\rosha/Documents/M.Tech/MU/Major_Project/New_Model_QCNN/NVIDIA_App/Testing_App_deployment\app\camera\__init__.py"
+'''
 from typing import Optional, Tuple
 
 import numpy as np
 
 try:
     import depthai as dai
-except Exception:  # pragma: no cover - dev machine without depthai
+except Exception:  #  without depthai will raise ImportError
     dai = None
 
-PREVIEW_W, PREVIEW_H = 640, 400  # inference-friendly; also the depth output size
+PREVIEW_W, PREVIEW_H = 640, 400  #the depth output size,this is the size of the depth frame that will be sent to the host. The depth frame is aligned to the RGB frame,so it should be the same size as the RGB preview frame.
 
 
 class OakCamera:
@@ -86,7 +79,7 @@ class OakCamera:
         if self.q_depth is not None:
             d = self.q_depth.tryGet()
             if d is not None:
-                depth = d.getFrame()  # uint16, millimetres, aligned to rgb
+                depth = d.getFrame()  # usame as  aligned to rgb
         return rgb, depth
 
     def __exit__(self, *exc):

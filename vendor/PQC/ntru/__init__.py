@@ -1,20 +1,4 @@
-"""
-NTRU Post-Quantum Cryptography Implementation
-
-NTRU is a lattice-based public-key cryptosystem that is resistant to
-attacks by quantum computers.
-
-Ring: R = Z[X]/(X^N - 1)
-Parameters: N=509, p=3, q=2048 (standard secure parameters)
-
-Encryption Modes:
-- Hybrid (v3): NTRU KEM + AES-256-GCM (NTRUEncryptor, NTRUDecryptor)
-- Pure NTRU (v4): Direct NTRU polynomial encryption (PureNTRUEncryptor, PureNTRUDecryptor)
-
-References:
-- NTRU: A Ring-Based Public Key Cryptosystem (Hoffstein, Pipher, Silverman)
-- NIST Post-Quantum Cryptography Standardization
-"""
+"""NTRU package: key generation, hybrid (NTRU+AES-GCM) and pure-NTRU encrypt/decrypt."""
 
 from .keygen import NTRUKeyGenerator
 from .encrypt import NTRUEncryptor

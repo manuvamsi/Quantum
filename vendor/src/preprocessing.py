@@ -14,19 +14,9 @@ from typing import Tuple, Optional
 
 class FacePreprocessor:
     """
-    Enterprise-grade face preprocessing with configurable output size.
-
-    Args:
+    
         output_size: Default output size (16 for classification, 64 for recognition)
 
-    Usage:
-        # For classification (16×16)
-        preprocessor = FacePreprocessor(output_size=16)
-        img = preprocessor.preprocess(image)
-
-        # For recognition (64×64)
-        preprocessor = FacePreprocessor(output_size=64)
-        img = preprocessor.preprocess(image, for_recognition=True)
     """
 
     def __init__(self, output_size: int = 16):
@@ -70,24 +60,8 @@ class FacePreprocessor:
         return cv2.cvtColor(ycrcb, cv2.COLOR_YCrCb2BGR)
     
     def preprocess(self, image: np.ndarray, for_recognition: bool = False) -> np.ndarray:
-        """
-        Full preprocessing pipeline
-
-        Args:
-            image: Input image (BGR or RGB)
-            for_recognition: If True, output 64×64 for QCNN recognition
-                           If False, output self.output_size (default 16×16) for classification
-
-        Steps:
-        1. CLAHE for lighting
-        2. Gamma correction
-        3. Skin tone normalization
-        4. Resize to target size
-        5. Normalize to [0, 1]
-
-        Returns:
-            Preprocessed image of shape (H, W, 3) normalized to [0, 1]
-        """
+      
+        
         # Apply enhancements
         img = self.apply_clahe(image)
         img = self.gamma_correction(img)
@@ -106,15 +80,4 @@ class FacePreprocessor:
         return img
 
     def preprocess_for_recognition(self, image: np.ndarray) -> np.ndarray:
-        """
-        Convenience method for QCNN recognition preprocessing.
-
-        Same as preprocess(image, for_recognition=True)
-
-        Args:
-            image: Input image (BGR or RGB)
-
-        Returns:
-            64×64×3 preprocessed image normalized to [0, 1]
-        """
         return self.preprocess(image, for_recognition=True)

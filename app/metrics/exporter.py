@@ -1,9 +1,6 @@
 """
 exporter.py — application Prometheus metrics.
-
-Exposes /metrics on `metrics.port` (default 9108) so Prometheus can scrape access events,
-recognition latency, liveness failures, model status, and DB size. prometheus_client is
-guarded so the app still runs if it isn't installed (metrics simply become no-ops).
+This just helps to track the events and other metrics of the application, but it is not mandatory to run the app.
 """
 
 try:

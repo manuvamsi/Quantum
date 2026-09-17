@@ -1,9 +1,5 @@
 """
-landmarks.py — face landmarks for the liveness FALLBACK (blink + head-turn) only.
-
-Uses MediaPipe FaceMesh when available (guarded import so this file compiles without it).
-The PRIMARY liveness is OAK-D depth; landmarks are only consulted when depth is weak or
-unavailable, so the cost of MediaPipe is paid rarely.
+Checks the liveness
 """
 
 from typing import Optional

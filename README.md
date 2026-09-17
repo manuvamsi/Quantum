@@ -1,24 +1,9 @@
-# ReQAgnIze — Testing / Deployment Package
-
-A **self-contained, minimal copy** of the ReQAgnIze quantum face-access app for a teammate to
-**run and verify on a fresh machine**. It has the runtime only — **no training code, no MLOps,
-no monitoring, no datasets**. Everything it needs (model code + weights + PQC) lives in this one
-folder; nothing points outside it.
-
-**What it does:** camera frame → face detect (Haar) → liveness → **10-qubit face/non-face gate**
-→ **V2 Quantum Haar-Wavelet recognition** (512-dim, ChromaDB) → identity with **PQC-NTRU**
-encrypted name/phone/age → **ACCESS ALLOWED / DENIED**.
-
-Works on a plain **laptop webcam** (Windows / Linux / macOS) out of the box, and on a
-**Jetson + OAK-D Lite** after flipping a few config lines (see *Jetson* below).
-
----
 
 ## 1. Requirements
 
 - **Python 3.10 or 3.11** (3.11 recommended — matches the pinned wheels).
 - A **webcam** for the live test.
-- ~2 GB disk for the Python packages (torch, chromadb, …).
+
 
 Check your Python:
 ```bash
@@ -127,27 +112,6 @@ Generated on first run (git-ignored, safe to delete to reset): `vector_db/`, `ev
 
 ---
 
-## 6. Jetson + OAK-D Lite (optional, later)
-
-On the device, install deps the Jetson way, then flip four `config.yaml` lines back to device mode:
-
-```bash
-bash scripts/identify_board.sh     # confirm the board / JetPack
-bash scripts/setup_jetson.sh       # torch from the JetPack wheel, cv2 from apt, + depthai
-```
-
-In `config.yaml`:
-| key | laptop (default) | Jetson |
-|-----|------------------|--------|
-| `camera.backend` | `webcam` | `auto` |
-| `liveness.local_test_mode` | `true` | `false` (use real depth + gestures) |
-| `gpio.enabled` | `false` | `true` (physical button/relay) |
-| `metrics.enabled` | `false` | `true` (Prometheus, optional) |
-
-Device-only extras (`depthai`, `Jetson.GPIO`, `mediapipe`) are the commented lines at the bottom
-of `requirements-app.txt`. They're import-guarded — the app runs without them on a laptop.
-
----
 
 ## Troubleshooting
 

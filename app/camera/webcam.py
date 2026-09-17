@@ -1,8 +1,6 @@
-"""
-webcam.py — a plain USB/laptop webcam backend (cv2.VideoCapture) with the same interface
-as OakCamera, for running the app LOCALLY without an OAK-D. `read()` returns (rgb_bgr, None)
-— there is no depth, so pair this with `liveness.local_test_mode: true` on a dev machine.
-"""
+'''
+Webcam camera backend is not mandatory as of now,you can choose "auto" in the "NVIDIA_App/Testing_App_deployment/app/camera/__init__.py"
+'''
 
 import cv2
 

@@ -1,16 +1,4 @@
-"""
-NTRU + AES-256-GCM Hybrid Decryption (True Post-Quantum Security)
-
-This implements proper PQC hybrid decryption:
-1. Decrypt AES key from NTRU ciphertext using private key
-2. Decrypt data with AES-256-GCM
-3. Verify authentication tag (integrity check)
-
-Security Properties:
-- Resistant to both classical and quantum attacks
-- Authenticated decryption with integrity verification
-- Fails safely if data has been tampered with
-"""
+"""NTRU + AES-256-GCM hybrid decryption."""
 
 import numpy as np
 import hashlib
@@ -21,77 +9,36 @@ from .polynomial_ring import PolynomialRing
 
 
 class NTRUDecryptor:
-    """
-    NTRU + AES-256-GCM Hybrid Decryption for facial embeddings
-
-    Provides true post-quantum security with authenticated decryption.
-    """
+    """Decrypts embeddings and metadata encrypted by NTRUEncryptor."""
 
     def __init__(self, private_key: Dict):
-        """
-        Initialize decryptor with NTRU private key
-
-        Args:
-            private_key: Dictionary containing {'f', 'Fp', 'N', 'p', 'q'}
-        """
+        """Initialise with an NTRU private key {'f', 'Fp', 'N', 'p', 'q'}."""
         self.f = private_key['f']
         self.Fp = private_key['Fp']
         self.N = private_key['N']
         self.p = private_key['p']
         self.q = private_key['q']
 
-        # Initialize polynomial ring
         self.ring = PolynomialRing(self.N, self.q, self.p)
 
     def _ntru_decapsulate_key(self, ntru_ciphertext: np.ndarray,
                                seed_coeffs: np.ndarray = None) -> bytes:
-        """
-        NTRU Key Decapsulation Mechanism
-
-        Decrypts the seed from NTRU ciphertext and derives AES key.
-        For reliability, can also use stored seed_coeffs directly.
-
-        Args:
-            ntru_ciphertext: NTRU ciphertext polynomial
-            seed_coeffs: Optional stored seed coefficients (for reliability)
-
-        Returns:
-            32-byte AES key derived via SHA-256
-        """
+        """Recover the 32-byte AES key from the NTRU ciphertext (or stored seed)."""
         if seed_coeffs is not None:
-            # Use stored seed for reliable decryption
             seed_bytes = seed_coeffs.tobytes()
             return hashlib.sha256(seed_bytes).digest()
 
-        # NTRU Decryption to recover seed
-        # Step 1: a = f * c (mod q)
         a = self.ring.multiply(self.f, ntru_ciphertext, self.q)
 
-        # Step 2: Center-lift and reduce mod p
         a = self.ring.mod_reduce(a, self.p)
 
-        # Step 3: m = Fp * a (mod p)
         decrypted_seed = self.ring.multiply(self.Fp, a, self.p)
 
-        # Derive AES key from decrypted seed using SHA-256
         seed_bytes = decrypted_seed.tobytes()
         return hashlib.sha256(seed_bytes).digest()
 
     def decrypt_embedding(self, encrypted_data: Dict) -> np.ndarray:
-        """
-        Decrypt an encrypted facial embedding
-
-        Supports multiple versions:
-        - Version 3: True PQC (NTRU + AES-256-GCM)
-        - Version 2: Legacy hybrid (for backward compatibility)
-        - Version 1/None: Original NTRU-only (legacy)
-
-        Args:
-            encrypted_data: Dictionary from encrypt_embedding()
-
-        Returns:
-            Decrypted 512-dim float embedding
-        """
+        """Decrypt an embedding, dispatching on its version."""
         version = encrypted_data.get('version', 1)
 
         if version >= 3:
@@ -102,13 +49,9 @@ class NTRUDecryptor:
             return self._decrypt_embedding_legacy(encrypted_data)
 
     def _decrypt_embedding_pqc(self, encrypted_data: Dict) -> np.ndarray:
-        """
-        Decrypt using true PQC (NTRU KEM + AES-256-GCM)
-
-        This provides authenticated decryption with integrity verification.
-        """
+        """Decrypt a version-3 embedding (NTRU KEM + AES-256-GCM)."""
         ntru_ciphertext = encrypted_data['ntru_ciphertext']
-        seed_coeffs = encrypted_data.get('seed_coeffs')  # For reliable decryption
+        seed_coeffs = encrypted_data.get('seed_coeffs')
         aes_nonce = encrypted_data['aes_nonce']
         aes_ciphertext = encrypted_data['aes_ciphertext']
         aad = encrypted_data['aad']
@@ -116,21 +59,17 @@ class NTRUDecryptor:
         original_norm = encrypted_data['original_norm']
         scale_factor = encrypted_data['scale_factor']
 
-        # Step 1: Decapsulate AES key from NTRU ciphertext
         aes_key = self._ntru_decapsulate_key(ntru_ciphertext, seed_coeffs)
 
-        # Step 2: Decrypt embedding with AES-256-GCM
         aesgcm = AESGCM(aes_key)
         try:
             embedding_bytes = aesgcm.decrypt(aes_nonce, aes_ciphertext, aad)
         except InvalidTag:
             raise ValueError("Decryption failed: Data integrity check failed (tampering detected)")
 
-        # Step 3: Convert bytes back to embedding
         quantized = np.frombuffer(embedding_bytes, dtype=np.int16)
         embedding = quantized.astype(np.float32) / scale_factor
 
-        # Step 4: Restore original norm
         current_norm = np.linalg.norm(embedding)
         if current_norm > 0:
             embedding = embedding * (original_norm / current_norm)
@@ -138,7 +77,7 @@ class NTRUDecryptor:
         return embedding.reshape(original_shape)
 
     def _decrypt_embedding_hybrid_v2(self, encrypted_data: Dict) -> np.ndarray:
-        """Legacy v2 decryption (PRNG-based XOR)"""
+        """Decrypt a legacy version-2 embedding."""
         encrypted_bytes = encrypted_data['encrypted_bytes']
         original_shape = encrypted_data['original_shape']
         original_norm = encrypted_data['original_norm']
@@ -164,7 +103,7 @@ class NTRUDecryptor:
         return embedding.reshape(original_shape)
 
     def _decrypt_embedding_legacy(self, encrypted_data: Dict) -> np.ndarray:
-        """Legacy v1 decryption (pure NTRU polynomial)"""
+        """Decrypt a legacy version-1 embedding."""
         ciphertexts = encrypted_data['ciphertexts']
         original_shape = encrypted_data['original_shape']
         scale_factor = encrypted_data['scale_factor']
@@ -180,30 +119,14 @@ class NTRUDecryptor:
         return embedding
 
     def decrypt_polynomial(self, ciphertext: np.ndarray) -> np.ndarray:
-        """
-        Decrypt a single ciphertext polynomial (for legacy support)
-        """
+        """Decrypt a single ciphertext polynomial (legacy)."""
         a = self.ring.multiply(self.f, ciphertext, self.q)
         a = self.ring.mod_reduce(a, self.p)
         message = self.ring.multiply(self.Fp, a, self.p)
         return message
 
     def decrypt_metadata(self, encrypted_meta: Dict) -> str:
-        """
-        Decrypt encrypted metadata
-
-        Supports multiple versions for backward compatibility:
-        - Version 4+: Pure NTRU (no AES)
-        - Version 3: NTRU KEM + AES-256-GCM
-        - Version 2: Hybrid PRNG-based
-        - Version 1: Legacy polynomial
-
-        Args:
-            encrypted_meta: Dictionary from encrypt_metadata()
-
-        Returns:
-            Decrypted metadata string
-        """
+        """Decrypt metadata, dispatching on its version."""
         version = encrypted_meta.get('version', 1)
 
         if version >= 4:
@@ -216,17 +139,7 @@ class NTRUDecryptor:
             return self._decrypt_metadata_legacy(encrypted_meta)
 
     def _decrypt_metadata_pure_ntru(self, encrypted_meta: Dict) -> str:
-        """
-        Decrypt metadata using Pure NTRU (version 4+)
-
-        No AES layer - direct NTRU polynomial decryption.
-
-        Args:
-            encrypted_meta: Encrypted metadata dictionary
-
-        Returns:
-            Decrypted metadata string
-        """
+        """Decrypt version-4 metadata (pure NTRU, no AES)."""
         from .pure_ntru import PureNTRUDecryptor
 
         pure_decryptor = PureNTRUDecryptor({
@@ -241,17 +154,15 @@ class NTRUDecryptor:
         return decrypted_bytes.decode('utf-8')
 
     def _decrypt_metadata_pqc(self, encrypted_meta: Dict) -> str:
-        """Decrypt metadata using true PQC (NTRU KEM + AES-256-GCM)"""
+        """Decrypt version-3 metadata (NTRU KEM + AES-256-GCM)."""
         ntru_ciphertext = encrypted_meta['ntru_ciphertext']
         seed_coeffs = encrypted_meta.get('seed_coeffs')
         aes_nonce = encrypted_meta['aes_nonce']
         aes_ciphertext = encrypted_meta['aes_ciphertext']
         aad = encrypted_meta['aad']
 
-        # Decapsulate AES key from NTRU ciphertext
         aes_key = self._ntru_decapsulate_key(ntru_ciphertext, seed_coeffs)
 
-        # Decrypt metadata with AES-256-GCM
         aesgcm = AESGCM(aes_key)
         try:
             metadata_bytes = aesgcm.decrypt(aes_nonce, aes_ciphertext, aad)
@@ -261,7 +172,7 @@ class NTRUDecryptor:
         return metadata_bytes.decode('utf-8')
 
     def _decrypt_metadata_hybrid_v2(self, encrypted_meta: Dict) -> str:
-        """Legacy v2 metadata decryption"""
+        """Decrypt legacy version-2 metadata."""
         encrypted_bytes = encrypted_meta['encrypted_bytes']
 
         prng_seed = encrypted_meta.get('prng_seed')
@@ -280,7 +191,7 @@ class NTRUDecryptor:
             return decrypted_bytes.tobytes().decode('utf-8', errors='ignore').rstrip('\x00')
 
     def _decrypt_metadata_legacy(self, encrypted_meta: Dict) -> str:
-        """Legacy v1 metadata decryption"""
+        """Decrypt legacy version-1 metadata."""
         ciphertexts = encrypted_meta['ciphertexts']
         original_length = encrypted_meta['original_length']
         chunk_size = self.N - 1
@@ -300,7 +211,7 @@ class NTRUDecryptor:
             return decrypted_bytes.decode('utf-8', errors='ignore').rstrip('\x00')
 
     def _reassemble_chunks(self, chunks: List[np.ndarray], original_shape: tuple) -> np.ndarray:
-        """Reassemble decrypted chunks (legacy support)"""
+        """Reassemble decrypted chunks into the original shape (legacy)."""
         total_len = np.prod(original_shape)
         chunk_size = self.N - 1
 
@@ -312,61 +223,46 @@ class NTRUDecryptor:
         return result.reshape(original_shape)
 
     def _dequantize_embedding(self, quantized: np.ndarray, scale_factor: float) -> np.ndarray:
-        """Dequantize embedding (legacy support)"""
+        """Scale integer coefficients back to floats (legacy)."""
         return quantized.astype(np.float32) / scale_factor
 
     def decrypt_all_embeddings(self, encrypted_embeddings: List[Dict]) -> List[np.ndarray]:
-        """Decrypt a list of encrypted embeddings"""
+        """Decrypt a list of encrypted embeddings."""
         return [self.decrypt_embedding(enc) for enc in encrypted_embeddings]
 
 
 def decrypt_embedding(encrypted_data: Dict, private_key: Dict) -> np.ndarray:
-    """
-    Convenience function to decrypt an embedding
-
-    Args:
-        encrypted_data: Encrypted embedding dictionary
-        private_key: NTRU private key
-
-    Returns:
-        Decrypted 512-dim embedding
-    """
+    """Decrypt an embedding with the given private key."""
     decryptor = NTRUDecryptor(private_key)
     return decryptor.decrypt_embedding(encrypted_data)
 
 
 if __name__ == "__main__":
-    # Test decryption
     from keygen import NTRUKeyGenerator
     from encrypt import NTRUEncryptor
 
     print("Testing NTRU + AES-256-GCM Hybrid Encryption/Decryption...")
     print("=" * 60)
 
-    # Generate keys
     generator = NTRUKeyGenerator()
     public_key, private_key = generator.generate_keys()
 
-    # Create test embedding (512-dim)
     original_embedding = np.random.randn(512).astype(np.float32)
     original_embedding = original_embedding / np.linalg.norm(original_embedding)
 
     print(f"Original embedding shape: {original_embedding.shape}")
     print(f"Original first 5 values: {original_embedding[:5]}")
 
-    # Encrypt
     encryptor = NTRUEncryptor(public_key)
     encrypted = encryptor.encrypt_embedding(original_embedding)
     print(f"\nEncryption successful (Version {encrypted['version']})")
 
-    # Decrypt
     decryptor = NTRUDecryptor(private_key)
     decrypted_embedding = decryptor.decrypt_embedding(encrypted)
 
     print(f"\nDecrypted embedding shape: {decrypted_embedding.shape}")
     print(f"Decrypted first 5 values: {decrypted_embedding[:5]}")
 
-    # Verify similarity
     cosine_sim = np.dot(original_embedding, decrypted_embedding) / (
         np.linalg.norm(original_embedding) * np.linalg.norm(decrypted_embedding)
     )
@@ -377,7 +273,6 @@ if __name__ == "__main__":
     else:
         print("WARNING: Similarity is low")
 
-    # Test metadata
     print("\n" + "=" * 60)
     print("Testing Metadata Encryption/Decryption...")
 

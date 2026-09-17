@@ -11,3 +11,9 @@ vendor/PQC/keys/
 vendor/PQC/encrypted_metadata/
 vendor/PQC/encrypted_store/
 vendor/logs/
+
+# Runtime-generated recognition DB (contains face embeddings) — never commit.
+# Only the TOP-LEVEL models/ runtime dir and the recognition_db pickles are ignored;
+# the vendored model WEIGHTS under vendor/models/ (*.pth, *.pkl) MUST be committed.
+/models/
+vendor/models/recognition_db_*.pkl

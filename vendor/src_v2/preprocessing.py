@@ -1,14 +1,4 @@
-"""
-Preprocessing pipeline for robust face recognition (v2)
-Handles: lighting, skin tones, emotions, masks, glasses
 
-This is identical to v1 preprocessing - the difference in v2 is
-in the feature extraction (Quantum Haar Wavelet) not preprocessing.
-
-Supports two output sizes:
-- 16×16: For QCNN classification (face/non-face)
-- 64×64: For 8-qubit Hierarchical QCNN recognition (embedding extraction)
-"""
 
 import cv2
 import numpy as np
@@ -16,21 +6,7 @@ from typing import Tuple, Optional
 
 
 class FacePreprocessor:
-    """
-    Enterprise-grade face preprocessing with configurable output size.
-
-    Args:
-        output_size: Default output size (16 for classification, 64 for recognition)
-
-    Usage:
-        # For classification (16×16)
-        preprocessor = FacePreprocessor(output_size=16)
-        img = preprocessor.preprocess(image)
-
-        # For recognition (64×64)
-        preprocessor = FacePreprocessor(output_size=64)
-        img = preprocessor.preprocess(image, for_recognition=True)
-    """
+ 
 
     def __init__(self, output_size: int = 16):
         self.output_size = output_size
@@ -74,25 +50,7 @@ class FacePreprocessor:
 
     def preprocess(self, image: np.ndarray, for_recognition: bool = False,
                    skip_resize: bool = False) -> np.ndarray:
-        """
-        Full preprocessing pipeline
-
-        Args:
-            image: Input image (BGR or RGB)
-            for_recognition: If True, output 64×64 for QCNN recognition
-                           If False, output self.output_size (default 16×16) for classification
-            skip_resize: If True, skip resizing (image already at target size)
-
-        Steps:
-        1. CLAHE for lighting
-        2. Gamma correction
-        3. Skin tone normalization
-        4. Resize to target size (unless skip_resize=True)
-        5. Normalize to [0, 1]
-
-        Returns:
-            Preprocessed image of shape (H, W, 3) normalized to [0, 1]
-        """
+       
         # Apply enhancements
         img = self.apply_clahe(image)
         img = self.gamma_correction(img)
@@ -112,15 +70,6 @@ class FacePreprocessor:
         return img
 
     def preprocess_for_recognition(self, image: np.ndarray) -> np.ndarray:
-        """
-        Convenience method for QCNN recognition preprocessing.
-
-        Same as preprocess(image, for_recognition=True)
-
-        Args:
-            image: Input image (BGR or RGB)
-
-        Returns:
-            64×64×3 preprocessed image normalized to [0, 1]
-        """
+     
+       
         return self.preprocess(image, for_recognition=True)
